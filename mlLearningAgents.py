@@ -59,11 +59,11 @@ class GameStateFeatures:
 class QLearnAgent(Agent):
 
     def __init__(self,
-                 alpha: float = 0.20,
-                 epsilon: float = 1,
+                 alpha: float = 0.30,
+                 epsilon: float = 0.1,
                  gamma: float = 0.8,
                  maxAttempts: int = 30,
-                 numTraining: int = 2000):
+                 numTraining: int = 30):
         """
         These values are either passed from the command line (using -a alpha=0.5,...)
         or are set to the default values above.
