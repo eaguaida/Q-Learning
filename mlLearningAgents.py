@@ -135,7 +135,7 @@ class QLearnAgent(Agent):
 
         # Reward for winning the game
         if endState.isWin():
-            reward += 2000
+            reward += 1000
 
         # Consider distance to the nearest food as an incentive to move closer
         foodGrid = endState.getFood()
@@ -152,13 +152,23 @@ class QLearnAgent(Agent):
         if ghostPositions:
             distancesToGhosts = [manhattanDistance(pacmanPos, ghostPos) for ghostPos in ghostPositions]
             nearestGhostDistance = min(distancesToGhosts)
-            if nearestGhostDistance <= 2:  # Dangerously close
+            if nearestGhostDistance <= 1:  # Dangerously close
                 reward -= (3 - nearestGhostDistance) * 100  # Increasing penalty the closer the ghost is
 
         return reward
 
 
-    
+    def __eq__(self, other):
+        if isinstance(other, GameStateFeatures):
+            return (self.pacmanPosition == other.pacmanPosition and
+                    self.ghostPositions == other.ghostPositions and
+                    self.numFood == other.numFood and
+                    self.foodPositions == other.foodPositions)
+        return False
+
+    def __hash__(self):
+        return hash((self.pacmanPosition, tuple(self.ghostPositions), self.numFood, tuple(self.foodPositions)))
+
     # WARNING: You will be tested on the functionality of this method
     # DO NOT change the function signature
     def getQValue(self,
@@ -219,21 +229,15 @@ class QLearnAgent(Agent):
     # WARNING: You will be tested on the functionality of this method
     # DO NOT change the function signature
     def updateCount(self, state, action):
-        """
-        Increment the count for the given state-action pair.
-        """
-        if (state, action) not in self.counts:
-            self.counts[(state, action)] = 1
+        stateRep = self.stateToTuple(state)
+        if (stateRep, action) not in self.counts:
+            self.counts[(stateRep, action)] = 1
         else:
-            self.counts[(state, action)] += 1
+            self.counts[(stateRep, action)] += 1
 
-    # WARNING: You will be tested on the functionality of this method
-    # DO NOT change the function signature
     def getCount(self, state, action):
-        """
-        Returns the count for the state-action pair.
-        """
-        return self.counts.get((state, action), 0)
+        stateRep = self.stateToTuple(state)
+        return self.counts.get((stateRep, action), 0)
 
     # WARNING: You will be tested on the functionality of this method
     # DO NOT change the function signature
@@ -242,10 +246,7 @@ class QLearnAgent(Agent):
         Computes the exploration function value.
         """
         # Example exploration strategy: epsilon-greedy
-        if counts < self.epsilon:
-            return float('inf')  # Encourage exploration
-        else:
-            return utility
+        return utility + self.alpha / (1 + counts)
 
 
     # WARNING: You will be tested on the functionality of this method
@@ -256,10 +257,16 @@ class QLearnAgent(Agent):
             legal.remove(Directions.STOP)
 
         stateFeatures = GameStateFeatures(state)
-        self.epsilon -= (self.epsilon / self.getNumTraining()) if self.getEpisodesSoFar() < self.getNumTraining() else 0
-
+        
         if random.random() < self.epsilon:
+            self.epsilon -= (self.epsilon / self.getNumTraining()) if self.getEpisodesSoFar() < self.getNumTraining() else 0
             chosenAction = random.choice(legal)
+            qValues = [self.getQValue(stateFeatures, action) for action in legal]
+            counts = [self.getCount(stateFeatures, action) for action in legal]
+            explorationValues = [self.explorationFn(utility, count) for utility, count in zip(qValues, counts)]
+            maxExplorationValue = max(explorationValues)
+            bestActions = [action for action, value in zip(legal, explorationValues) if value == maxExplorationValue]
+            chosenAction = random.choice(bestActions)
             actionType = 'Exploration'
         else:
             qValues = [self.getQValue(stateFeatures, action) for action in legal]
